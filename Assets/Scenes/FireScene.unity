@@ -3209,10 +3209,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   particle: {fileID: 6997595346014441297, guid: 1eb712f1d6fd3436aac2e647df4c6538, type: 3}
-  maxSmokeParticles: 120
-  particleNumbers: {x: 5, y: 5, z: 20}
+  maxSmokeParticles: 600
+  particleNumbers: {x: 12, y: 10, z: 40}
   smoothingLength: 3
-  timeInterval: 0.4
+  timeInterval: 0.1
   particleParent: {fileID: 139095815}
   smokeSource: {fileID: 1531221056}
   timerText: {fileID: 900996714}

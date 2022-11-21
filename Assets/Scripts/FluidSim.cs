@@ -109,14 +109,14 @@ public class FluidSim : MonoBehaviour
                     particleScripts[ind].index = ind;
                     particleScripts[ind].smoothingLength = smoothingLength;
                     
-                    particleMass[ind] = 0.3f;
+                    particleMass[ind] = 0.05f;
                     densities[ind] = baseDensity;
                     forces[ind] = zero;
                     velocities[ind] = zero;
                     
                     temperatures[ind] = 25;
 
-                    particles[ind].gameObject.GetComponent<Renderer>().material.color = new Color((-0.1f*temperatures[ind]+3), 0, (0.1f*temperatures[ind]-2));
+                    particles[ind].gameObject.GetComponent<Renderer>().material.color = new Color(0, 0.8f, 1, 1);
                 }
             }
         }
@@ -130,9 +130,9 @@ public class FluidSim : MonoBehaviour
 
         int temp = curParticleNum;
 
-        for(int i = 0; i < maxSmokeParticles; i+=40)
+        for(int i = 0; i < maxSmokeParticles; i+=10)
         {
-            for(int j = 0; j < 40; j++)
+            for(int j = 0; j < 10; j++)
             {
                 int ind = temp + i + j;
 
@@ -150,7 +150,7 @@ public class FluidSim : MonoBehaviour
 
                 particles[ind].gameObject.GetComponent<Renderer>().material.color = new Color(0, 0, 0, 1);
 
-                particleMass[ind] = 0.5f;
+                particleMass[ind] = 0.1f;
                 temperatures[ind] = 80;
                 densities[ind] = 0.1f;
                 forces[ind] = zero;
@@ -167,7 +167,7 @@ public class FluidSim : MonoBehaviour
     {
         InitializeParticles();
         StartCoroutine(InitializeSmoke());
-        Time.timeScale = .3f;
+        Time.timeScale = 0.3f;
 
         //StartCoroutine(Initialize2());
         StartCoroutine(RunSim());
@@ -222,6 +222,8 @@ public class FluidSim : MonoBehaviour
                     densities[i] += particleMass[j] * Poly6(distance);
                 }
 
+                densities[i] /= 800;
+
                 //pressures[i] = 4f * densities[i] * ((densities[i] / baseDensity) - 1);
                 //pressures[i] = GasConstant * (densities[i] - baseDensity);
                 pressures[i] = densities[i] * GasConstant * (temperatures[i] + 273) / 0.029f;
@@ -248,7 +250,7 @@ public class FluidSim : MonoBehaviour
             for(int i = 0; i < curParticleNum; i++)
             {
                 //print(forces[i]);
-                particleRigidbodies[i].AddForce(forces[i], ForceMode.Impulse);
+                particleRigidbodies[i].AddForce(forces[i] / 200, ForceMode.Force);
                 velocities[i] = particleRigidbodies[i].velocity;
                 //particleRigidbodies[i].velocity += forces[i]/particleMass * timeInterval;
             }
