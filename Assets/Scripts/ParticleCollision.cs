@@ -6,7 +6,7 @@ public class ParticleCollision : MonoBehaviour
 {
     [HideInInspector]public int index;
     [HideInInspector]public float smoothingLength;
-    [HideInInspector]public Vector3 contactPos;
+    [HideInInspector]public float temperature;
     private Vector3 zero;
 
     private Collider[] hitColliders;
@@ -24,15 +24,14 @@ public class ParticleCollision : MonoBehaviour
         
     }
 
-    private void OnCollisionEnter(Collision col)
+    private void OnTriggerEnter(Collider col)
     {
-        //if(!col.gameObject.CompareTag("Particle"))
-            //contactPos = col.contacts[0].point;
+        col.gameObject.GetComponent<TempDetector>().UpdateTemp(1, temperature);
     }
 
-    private void OnCollisionExit(Collision col)
+    private void OnTriggerExit(Collider col)
     {
-        //contactPos = zero;
+        col.gameObject.GetComponent<TempDetector>().UpdateTemp(-1, -temperature);
     }
 
     public List<int> Adjacents()

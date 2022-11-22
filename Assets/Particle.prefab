@@ -49,7 +49,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   index: 0
   smoothingLength: 0
-  contactPos: {x: 0, y: 0, z: 0}
+  temperature: 0
 --- !u!33 &7651003555482447265
 MeshFilter:
   m_ObjectHideFlags: 0
