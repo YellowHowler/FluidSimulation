@@ -12,16 +12,17 @@ public class FluidSim : MonoBehaviour
     [SerializeField] private float timeInterval;
     [SerializeField] private Transform particleParent;
     [SerializeField] private Transform smokeSource;
-    [SerializeField] private Text timerText;
 
-    private const float baseDensity = 1;
-    private const float surfaceTension = 1f;
+    private const float baseDensity = 1f;
+    private const float surfaceTension = 10f;
+    private const float particleMass = 1;
 
     private Vector3 zero = new Vector3(0, 0, 0);
     private Vector3 center;
     private Vector3 corner;
 
-    private float GasConstant = 8.314f;
+    private float Gamma = 1/7f;
+    private float GasConstant = 20f;
     private float Poly6KernelConstant;
     private float Poly6GradKernelConstant;
     private float SpikyKernelConstant;
@@ -33,8 +34,6 @@ public class FluidSim : MonoBehaviour
     private Transform[] particles;
     private Rigidbody[] particleRigidbodies;
     private ParticleCollision[] particleScripts;
-    private int[] particleType; // 0:air, 1:smoke
-    private float[] particleMass;
     private float[] densities;
     private float[] temperatures;
     private float[] pressures;
@@ -45,7 +44,7 @@ public class FluidSim : MonoBehaviour
     private int particleNumX;
     private int particleNumY;
     private int particleNumZ;
-    private float particleDistance = 0.3f;
+    private float particleDistance = 0.4f;
 
     private int curParticleNum;
 
@@ -58,10 +57,10 @@ public class FluidSim : MonoBehaviour
             Poly6GradKernelConstant = -945 / (32 * Mathf.PI * Mathf.Pow(smoothingLength, 9));
             SpikyKernelConstant = (15) / (Mathf.PI * Mathf.Pow(smoothingLength, 6));
             SpikyGradKernelConstant = (-45) / (Mathf.PI * Mathf.Pow(smoothingLength, 6));
-            //SurfaceTensionConstant = 32 / (Mathf.PI * Mathf.Pow(smoothingLength, 6)) * surfaceTension * Mathf.Sqrt(particleMass);
+            SurfaceTensionConstant = 32 / (Mathf.PI * Mathf.Pow(smoothingLength, 6)) * surfaceTension * Mathf.Sqrt(particleMass);
             SurfaceTensionOffset = Mathf.Pow(smoothingLength, 6) / 64;
 
-            GravityForce = new Vector3(0, -9.8f, 0);
+            //GravityForce = new Vector3(0, -9.8f, 0);
         }
         
         particleNumX = particleNumbers.x;
@@ -76,11 +75,9 @@ public class FluidSim : MonoBehaviour
         particleRigidbodies = new Rigidbody[particleNum];
         particleScripts = new ParticleCollision[particleNum];
 
-        particleType = new int[particleNum];
         densities = new float[particleNum];
         temperatures = new float[particleNum];
         pressures = new float[particleNum];
-        particleMass = new float[particleNum];
         forces = new Vector3[particleNum];
         velocities = new Vector3[particleNum];
 
@@ -110,9 +107,7 @@ public class FluidSim : MonoBehaviour
                     particleScripts[ind] = particles[ind].gameObject.GetComponent<ParticleCollision>();
                     particleScripts[ind].index = ind;
                     particleScripts[ind].smoothingLength = smoothingLength;
-                    
-                    particleType[ind] = 0;
-                    particleMass[ind] = 0.02f;
+
                     densities[ind] = baseDensity;
                     forces[ind] = zero;
                     velocities[ind] = zero;
@@ -153,8 +148,6 @@ public class FluidSim : MonoBehaviour
 
                 particles[ind].gameObject.GetComponent<Renderer>().material.color = new Color(0, 0, 0, 1);
 
-                particleType[ind] = 1;
-                particleMass[ind] = 0.01f;
                 temperatures[ind] = 90;
                 densities[ind] = baseDensity;
                 forces[ind] = zero;
@@ -170,10 +163,8 @@ public class FluidSim : MonoBehaviour
     void Start()
     {
         InitializeParticles();
-        StartCoroutine(InitializeSmoke());
-        Time.timeScale = 0.04f;
+        Time.timeScale = 0.5f;
 
-        //StartCoroutine(Initialize2());
         StartCoroutine(RunSim());
     }
 
@@ -223,15 +214,12 @@ public class FluidSim : MonoBehaviour
 
                     float distance = Vector3.Distance(particles[i].position, particles[j].position);
 
-                    densities[i] += particleMass[j] * Poly6(distance);
+                    densities[i] += particleMass * Poly6(distance);
                 }
 
                 //pressures[i] = 4f * densities[i] * ((densities[i] / baseDensity) - 1);
-                //pressures[i] = GasConstant * (densities[i] - baseDensity);
-                if(particleType[i] == 0) pressures[i] = densities[i] * GasConstant * (temperatures[i] + 273) / 0.029f;
-                else pressures[i] = densities[i] * GasConstant * (temperatures[i] + 273) / 0.028f;
-
-                print(pressures[i]);
+                pressures[i] = 20 * (densities[i] - baseDensity);
+                //pressures[i] = (baseDensity * Mathf.Pow(343, 2)) / (Gamma * Mathf.Pow(densities[i]/baseDensity, Gamma - 1));
             }
 
             for(int i = 0; i < curParticleNum; i++)
@@ -239,26 +227,23 @@ public class FluidSim : MonoBehaviour
                 foreach(int j in adjacents[i])
                 {
                     float distance = Vector3.Distance(particles[i].position, particles[j].position);
-                    Vector3 direction = (particles[i].position - particles[j].position).normalized + Random.insideUnitSphere*0.3f;
+                    Vector3 direction = (particles[i].position - particles[j].position).normalized;
 
-                    forces[i] += direction * ((pressures[i] + pressures[j]) / (2*densities[j])) * particleMass[j] * SpikyGrad(distance); // pressure force
-                    //forces[i] += 1.85f * (velocities[j] - velocities[i]) / densities[j] * particleMass[j] * SpikyGradSquared(distance); // viscosity force
-                    //forces[i] += baseDensity / (densities[i] + densities[j]) * direction * SurfaceTension(distance); // surface tension force
+                    forces[i] += direction * ((pressures[i] + pressures[j]) / (2*densities[j])) * particleMass * SpikyGrad(distance); // pressure force
+                    forces[i] += (velocities[j] - velocities[i]) / densities[j] * particleMass * SpikyGradSquared(distance); // viscosity force
+                    //forces[i] += baseDensity / (densities[i] + densities[j]) * direction * particleMass * SurfaceTension(distance); // surface tension force
                 }
 
-                //forces[i] = Vector3.ClampMagnitude(forces[i], 6f);
-                forces[i] += GravityForce * densities[i];
+                forces[i] = Vector3.ClampMagnitude(forces[i], 6f);
+                //forces[i] += GravityForce;
             }
 
             for(int i = 0; i < curParticleNum; i++)
             {
-                //print(forces[i]);
-                //particleRigidbodies[i].AddForce(forces[i]/200, ForceMode.Force);
-                if(densities[i] != 0) particleRigidbodies[i].velocity += forces[i] / 200 / densities[i] / particleMass[i] * timeInterval;
-                //particleRigidbodies[i].velocity += forces[i]/particleMass * timeInterval;
+                if(densities[i] != 0) particleRigidbodies[i].velocity += forces[i] / densities[i] * timeInterval;
+                velocities[i] = particleRigidbodies[i].velocity;
             }
 
-            timerText.text = (Time.time*10) + "";
             yield return sec;
         }
     }

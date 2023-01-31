@@ -116,7 +116,6 @@ public class AirSim : MonoBehaviour
                     particleScripts[ind] = particles[ind].gameObject.GetComponent<ParticleCollision>();
                     particleScripts[ind].index = ind;
                     particleScripts[ind].smoothingLength = smoothingLength;
-                    particleScripts[ind].temperature = temperatures[ind];
                     
                     particleType[ind] = 0;
                     particleMass[ind] = 1f;
@@ -168,7 +167,6 @@ public class AirSim : MonoBehaviour
                 particleScripts[ind] = particles[ind].gameObject.GetComponent<ParticleCollision>();
                 particleScripts[ind].index = ind;
                 particleScripts[ind].smoothingLength = smoothingLength;
-                particleScripts[ind].temperature = temperatures[ind];
 
                 particles[ind].gameObject.GetComponent<Renderer>().material.color = new Color(0, 0, 1, 0.7f);
 
