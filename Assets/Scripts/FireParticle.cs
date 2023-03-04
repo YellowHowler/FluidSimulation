@@ -89,7 +89,7 @@ public class FireParticle : MonoBehaviour
             float otherPressure;
             Vector3 otherVelocity;
 
-            force = Vector3.zero;
+            force = Vector3.up * size * 10;
 
             foreach(Transform i in adjacents)
             {
