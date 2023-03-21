@@ -2366,7 +2366,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!65 &1154234375
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -2489,7 +2489,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1228163685}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -50.35, y: 22.52, z: 68.61}
+  m_LocalPosition: {x: -63.96, y: 21.25, z: 68.61}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
@@ -2508,10 +2508,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   particle: {fileID: 6997595346014441297, guid: 1eb712f1d6fd3436aac2e647df4c6538, type: 3}
-  neighborCalculationStep: 4
+  neighborCalculationStep: 3
   maxSmokeParticles: 0
-  particleNumbers: {x: 15, y: 28, z: 15}
-  smoothingLength: 3
+  particleNumbers: {x: 7, y: 20, z: 7}
+  smoothingLength: 4
   timeInterval: 0.3
   particleParent: {fileID: 1929489485}
   smokeSource: {fileID: 0}
@@ -3572,7 +3572,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1922925341}
   m_LocalRotation: {x: 0, y: 0.7071068, z: 0, w: 0.7071068}
-  m_LocalPosition: {x: -63.8, y: 12.820001, z: 68.41}
+  m_LocalPosition: {x: -63.8, y: 14.55, z: 68.41}
   m_LocalScale: {x: 1.7788138, y: 2.7916615, z: 1.9168178}
   m_Children: []
   m_Father: {fileID: 0}
