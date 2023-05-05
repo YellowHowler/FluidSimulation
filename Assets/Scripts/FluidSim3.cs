@@ -129,8 +129,10 @@ public class FluidSim3 : MonoBehaviour
                     particleScripts[ind].smoothingLength = smoothingLength;
 
                     densities[ind] = baseDensity;
-                    forces[ind] = zero;
+                    forces[ind] = new Vector3(0, 0, -5);
                     velocities[ind] = zero;
+
+                    particleRigidbodies[ind].velocity = new Vector3(0, 0, -5);
                     
                     temperatures[ind] = 25;
 
@@ -183,7 +185,7 @@ public class FluidSim3 : MonoBehaviour
     void Start()
     {
         InitializeParticles();
-        Time.timeScale = 0.5f;
+        Time.timeScale = 0.2f;
 
         StartCoroutine(RunSim());
     }
@@ -260,7 +262,7 @@ public class FluidSim3 : MonoBehaviour
                 //pressures[i] = (baseDensity * Mathf.Pow(343, 2)) / (Gamma * Mathf.Pow(densities[i]/baseDensity, Gamma - 1));
                 //pressures[i] = PressureConstant * ( Mathf.Pow(densities[i] / baseDensity, ExponentialConstant) -1 );
 
-                pressures[i] = PressureConstant * Mathf.Pow(densities[i] / baseDensity, 7 - 1);
+                pressures[i] = PressureConstant * (Mathf.Pow(densities[i] / baseDensity, 7) - 1);
             }
 
             /*

@@ -1,0 +1,34 @@
+#pragma kernel CSMain
+
+RWTexture2D<float> Result;
+
+float time;
+
+float density = 0;
+
+struct Particle
+{
+    int ind;
+    float density;
+    float pressure;
+    float3 force;
+    float3 velocity;
+    float3 normal;
+    float3 position;
+};
+
+StructuredBuffer<Particle> particleBuffer;
+StructuredBuffer<int> neighborBuffer;
+
+[numthreads(8,1,1)]
+void GetPressure (uint3 id : SV_DispatchThreadID)
+{
+    if(id.x == 0) density = 0;
+
+    Particle particle = particleBuffer[particle.ind];
+
+    float3 dist = particleBuffer[id.x] - particleBuffer[neighborBuffer[id.x]];
+    density += Kernels.Poly6(dot(dist, dist));
+
+    Result[id.x] = density;
+}
