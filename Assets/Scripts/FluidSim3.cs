@@ -265,7 +265,6 @@ public class FluidSim3 : MonoBehaviour
                 pressures[i] = PressureConstant * (Mathf.Pow(densities[i] / baseDensity, 7) - 1);
             }
 
-            /*
             for(int i = 0; i < curParticleNum; i++)
             {
                 normals[i] = zero;
@@ -279,7 +278,6 @@ public class FluidSim3 : MonoBehaviour
                 normal *= smoothingLength * particleMass * Poly6GradKernelConstant;
                 normals[i] = normal;
             }
-            */
 
             for(int i = 0; i < curParticleNum; i++)
             {
@@ -317,7 +315,7 @@ public class FluidSim3 : MonoBehaviour
                     cohesionForce *= -surfaceTension * Mathf.Pow(particleMass, 2) * SurfaceTensionConstant;
                     curvatureForce *= -surfaceTension * particleMass;
 
-                    forces[i] += pressureForce + viscosityForce + cohesionForce;
+                    forces[i] += pressureForce + viscosityForce + cohesionForce + curvatureForce;
 
                     //forces[i] *= 0.001f;
 

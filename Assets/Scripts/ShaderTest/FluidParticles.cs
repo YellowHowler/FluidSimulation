@@ -8,6 +8,8 @@ public class FluidParticles : MonoBehaviour
     //for shader setup
     [SerializeField] private ComputeShader shader = null;
     protected int pressureHandle = -1;
+    protected int normalHandle = -1;
+    protected int forceHandle = -1;
     uint threadGroupSizeX;
     int groupSizeX;
     //
@@ -80,20 +82,43 @@ public class FluidParticles : MonoBehaviour
             return;
         }
 
-        pressureHandle = shader.FindKernel("GetPressure");
+        pressureHandle = shader.FindKernel("CalculatePressure");
+        normalHandle = shader.FindKernel("CalculateNormal");
+        forceHandle = shader.FindKernel("CalculateForces");
+
         shader.GetKernelThreadGroupSizes(pressureHandle, out threadGroupSizeX, out _, out _);
         groupSizeX = (int)((particleCount + threadGroupSizeX - 1) / threadGroupSizeX);
 
         int stride = sizeof(int) + (1+1+3+3+3+3)*sizeof(float);
         particleBuffer = new ComputeBuffer(particleCount, stride);
         particleBuffer.SetData(particleData);
+        
         shader.SetBuffer(pressureHandle, "particleBuffer", particleBuffer);
+        shader.SetBuffer(normalHandle, "particleBuffer", particleBuffer);
+        shader.SetBuffer(forceHandle, "particleBuffer", particleBuffer);
+
+        shader.SetInt("particleCount", particleCount);
+        shader.SetFloat("time", Time.time);
+        shader.SetFloat("SmoothingLength", smoothingLength);
+
+        shader.SetFloat("particleMass", particleMass);
+        shader.SetFloat("viscosity", viscosity);
+        shader.SetFloat("baseDensity", baseDensity);
+        shader.SetFloat("surfaceTension", surfaceTension);
+
+        shader.SetFloat("Poly6KernelConstant", Kernels.Poly6KernelConstant);
+        shader.SetFloat("Poly6GradKernelConstant", Kernels.Poly6GradKernelConstant);
+        shader.SetFloat("SpikyKernelConstant", Kernels.SpikyKernelConstant);
+        shader.SetFloat("SpikyGradKernelConstant", Kernels.SpikyGradKernelConstant);
+        shader.SetFloat("SpikyGradSquaredKernelConstant", Kernels.SpikyGradSquaredKernelConstant);
+        shader.SetFloat("ViscosityLaplaceKernelConstant", Kernels.ViscosityLaplaceKernelConstant);
+        shader.SetFloat("SurfaceTensionConstant", Kernels.SurfaceTensionConstant);
+        shader.SetFloat("SurfaceTensionOffset", Kernels.SurfaceTensionOffset);
     }
 
-    private void DispatchPressureKernel(int count)
+    private void DispatchKernels(int count)
     {
     	shader.Dispatch(pressureHandle, groupSizeX, 1, 1);
-        shader.SetFloat("time", Time.time);
     }
 
     protected virtual void OnEnable()
@@ -196,7 +221,7 @@ public class FluidParticles : MonoBehaviour
                 neighborBuffer.SetData(adjacents[i]);
                 shader.SetBuffer(pressureHandle, "neighborBuffer", neighborBuffer);
 
-                DispatchPressureKernel(adjacents[i].Count);
+                DispatchKernels(adjacents[i].Count);
                 
 
                 yield return 0;

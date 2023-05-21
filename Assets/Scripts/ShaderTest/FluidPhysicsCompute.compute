@@ -1,10 +1,31 @@
-#pragma kernel CSMain
+#pragma kernel CalculatePressure
+#pragma kernel CalculateNormal
+#pragma kernel CalculateForces
+#pragma kernel ApplyForces
 
 RWTexture2D<float> Result;
 
 float time;
 
-float density = 0;
+float pressureConstant;
+
+int particleCount;
+float smoothingLength;
+
+float particleMass;
+float baseDensity;
+float viscosity;
+float surfaceTension;
+float gravityForce;
+
+float Poly6KernelConstant;
+float Poly6GradKernelConstant;
+float SpikyKernelConstant;
+float SpikyGradKernelConstant;
+float SpikyGradSquaredKernelConstant;
+float ViscosityLaplaceKernelConstant;
+float SurfaceTensionConstant;
+float SurfaceTensionOffset;
 
 struct Particle
 {
@@ -20,15 +41,122 @@ struct Particle
 StructuredBuffer<Particle> particleBuffer;
 StructuredBuffer<int> neighborBuffer;
 
-[numthreads(8,1,1)]
-void GetPressure (uint3 id : SV_DispatchThreadID)
+float Poly6(float distance)
 {
-    if(id.x == 0) density = 0;
-
-    Particle particle = particleBuffer[particle.ind];
-
-    float3 dist = particleBuffer[id.x] - particleBuffer[neighborBuffer[id.x]];
-    density += Kernels.Poly6(dot(dist, dist));
-
-    Result[id.x] = density;
+    return pow(pow(smoothingLength, 2) - pow(distance, 2), 3);
 }
+
+float3 Poly6Grad(float3 distance)
+{
+    return pow(pow(smoothingLength, 2) - dot(distance, distance), 2) * distance;
+}
+
+float3 SpikyGrad(float3 distance)
+{
+    return pow(smoothingLength - length(distance), 2) * distance / length(distance);
+}
+
+float SpikyGradSquared(float distance)
+{
+    return SpikyGradSquaredKernelConstant * 1/distance * pow(smoothingLength-distance, 2) - (smoothingLength-distance);
+}    
+
+float ViscosityLaplace(float distance)
+{
+    return (smoothingLength - distance);
+}
+
+float SurfaceTension(float distance)
+{
+    if(distance < smoothingLength / 2)
+        return 2 * pow(smoothingLength - distance, 3) * pow(distance, 3) + SurfaceTensionOffset;
+    else
+        return pow(smoothingLength - distance, 3) * pow(distance, 3);
+}
+
+[numthreads(8,1,1)]
+void CalculatePressure (uint3 id : SV_DispatchThreadID)
+{
+    Particle particleI = particleBuffer[id.x];
+    particleI.density = 0;
+
+    for(int j = 0; j < particleCount; j++)
+    {
+        if(id.x == (uint)j) continue;
+
+        Particle particleJ = particleBuffer[j];
+
+        float3 distance = particleI.position - particleJ.position;
+        if(length(distance) > smoothingLength) continue;
+
+        particleI.density += Poly6(dot(distance, distance));
+    }
+
+    particleI.density *= Poly6KernelConstant * particleMass * baseDensity;
+    particleI.pressure = pressureConstant * (pow(particleI.density / baseDensity, 7) - 1);
+}
+
+[numthreads(8,1,1)]
+void CalculateNormal (uint3 id : SV_DispatchThreadID)
+{
+    Particle particleI = particleBuffer[id.x];
+    particleI.normal = 0;
+
+    for(int j = 0; j < particleCount; j++)
+    {
+        if(id.x == (uint)j) continue;
+
+        Particle particleJ = particleBuffer[j];
+
+        float3 distance = particleI.position - particleJ.position;
+        if(length(distance) > smoothingLength) continue;
+
+        particleI.normal += Poly6Grad(distance) / particleJ.density;
+    }
+
+    particleI.normal *= smoothingLength * particleMass * Poly6GradKernelConstant;
+}
+
+[numthreads(8,1,1)]
+void CalculateForces(uint3 id : SV_DispatchThreadID)
+{
+    Particle particleI = particleBuffer[id.x];
+
+    float3 pressureForce = 0;
+    float3 viscosityForce = 0;
+    float3 cohesionForce = 0;
+    float3 curvatureForce = 0;
+
+    for(int j = 0; j < particleCount; j++)
+    {
+        if(id.x == (uint)j) continue;
+
+        Particle particleJ = particleBuffer[j];
+
+        float3 distance = particleI.position - particleJ.position;
+        if(length(distance) > smoothingLength) continue;
+
+        viscosityForce += (particleI.velocity - particleJ.velocity) / particleJ.density * ViscosityLaplace(length(distance));
+        pressureForce -= (particleI.pressure / pow(particleI.density, 2) + particleJ.pressure / pow(particleJ.density, 2)) * SpikyGrad(distance);
+
+        float correctionFactor = 2 * baseDensity / (particleI.density + particleJ.density);
+        cohesionForce += correctionFactor * (distance / length(distance)) * SurfaceTension(length(distance));
+        curvatureForce += correctionFactor * (particleI.normal - particleJ.normal);
+    }
+
+    pressureForce *= pow(particleMass, 2) * SpikyGradKernelConstant;
+    viscosityForce *= viscosity * particleMass * ViscosityLaplaceKernelConstant;
+    cohesionForce *= -surfaceTension * pow(particleMass, 2) * SurfaceTensionConstant;
+    curvatureForce *= -surfaceTension * particleMass;
+
+    particleI.force += pressureForce + viscosityForce + cohesionForce + curvatureForce;
+    particleI.force += gravityForce * particleMass;
+}
+
+
+[numthreads(8,1,1)]
+void ApplyForces(uint3 id : SV_DispatchThreadID)
+{
+
+}
+
