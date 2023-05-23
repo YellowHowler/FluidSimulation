@@ -10,16 +10,22 @@ public class FluidParticles : MonoBehaviour
     protected int pressureHandle = -1;
     protected int normalHandle = -1;
     protected int forceHandle = -1;
+    protected int applyHandle = -1;
+    protected int colliderHandle = -1;
     uint threadGroupSizeX;
     int groupSizeX;
     //
     
     //parameter input 
-    [SerializeField] private GameObject particleObject;
     [SerializeField] private Vector3Int particleCounts;
     [SerializeField] private float smoothingLength;
     [SerializeField] private float timeInterval;
-    [SerializeField] private int neighborCalculationStep = 4;
+    //
+
+    //particle mesh
+    [SerializeField] private Mesh particleMesh = null;
+    [SerializeField] private Material material;
+    private float radius = 0.2f;
     //
 
     // for initializing particles
@@ -37,19 +43,20 @@ public class FluidParticles : MonoBehaviour
     private const float baseDensity = 10000;
     private const float surfaceTension = 1f;
     private const float viscosity = 0.001f;
+    private const float particleDrag = 0.025f;
     private float particleMass;
+    //
+
+    //constants
+    private const float BOUND_DAMPING = -0.5f;
+    private const float DT = 0.0008f;
     //
 
     // particle gameobjects
     private Transform[] particles;
-    private Rigidbody[] particleRigidbodies;
-    private ParticleCollision[] particleScripts;
-    private List<int>[] adjacents;
     //
 
-    //for iterating
-    private int nStepCalcNum = 0;
-    //
+    Bounds bounds;
     
     struct Particle
     {
@@ -60,12 +67,46 @@ public class FluidParticles : MonoBehaviour
         public Vector3 velocity;
         public Vector3 normal;
         public Vector3 position;
+
+        public Particle(int index, Vector3 pos)
+        {
+            ind = index;
+            position = pos;
+            velocity = Vector3.zero;
+            force = Vector3.zero;
+            normal = Vector3.zero;
+            density = 0f;
+            pressure = 0f;
+        }
     }
 
+    private struct SPHCollider
+    {
+        public Vector3 position;
+        public Vector3 right;
+        public Vector3 up;
+        public Vector2 scale;
+
+        public SPHCollider(Transform _transform)
+        {
+            position = _transform.position;
+            right = _transform.right;
+            up = _transform.up;
+            scale = new Vector2(_transform.lossyScale.x / 2f, _transform.lossyScale.y / 2f);     
+        }
+    }
+
+    //colliders
+    SPHCollider[] collidersArray;
+    ComputeBuffer collidersBuffer;
+    int SIZE_SPHCOLLIDER = 11 * sizeof(float);        
+    //
+
     //paritcle buffer
-    Particle[] particleData;
+    Particle[] particlesArray;
     ComputeBuffer particleBuffer;
-    ComputeBuffer neighborBuffer;
+    uint[] argsArray = { 0, 0, 0, 0, 0 };
+    ComputeBuffer argsBuffer;
     //
 
     protected virtual void InitShader()
@@ -85,26 +126,37 @@ public class FluidParticles : MonoBehaviour
         pressureHandle = shader.FindKernel("CalculatePressure");
         normalHandle = shader.FindKernel("CalculateNormal");
         forceHandle = shader.FindKernel("CalculateForces");
+        applyHandle = shader.FindKernel("ApplyForces");
+        colliderHandle = shader.FindKernel("ComputeColliders");
 
         shader.GetKernelThreadGroupSizes(pressureHandle, out threadGroupSizeX, out _, out _);
         groupSizeX = (int)((particleCount + threadGroupSizeX - 1) / threadGroupSizeX);
 
         int stride = sizeof(int) + (1+1+3+3+3+3)*sizeof(float);
+        print(particleCount);
         particleBuffer = new ComputeBuffer(particleCount, stride);
-        particleBuffer.SetData(particleData);
-        
-        shader.SetBuffer(pressureHandle, "particleBuffer", particleBuffer);
-        shader.SetBuffer(normalHandle, "particleBuffer", particleBuffer);
-        shader.SetBuffer(forceHandle, "particleBuffer", particleBuffer);
+        particleBuffer.SetData(particlesArray);
+
+        UpdateColliders();
+
+        argsArray[0] = particleMesh.GetIndexCount(0);
+        argsArray[1] = (uint)particleCount;
+        argsBuffer = new ComputeBuffer(1, 5 * sizeof(uint), ComputeBufferType.IndirectArguments);
+        argsBuffer.SetData(argsArray);
 
         shader.SetInt("particleCount", particleCount);
-        shader.SetFloat("time", Time.time);
+        shader.SetFloat("timeInterval", timeInterval);
         shader.SetFloat("SmoothingLength", smoothingLength);
 
         shader.SetFloat("particleMass", particleMass);
+        shader.SetFloat("radius", radius);
+
         shader.SetFloat("viscosity", viscosity);
         shader.SetFloat("baseDensity", baseDensity);
         shader.SetFloat("surfaceTension", surfaceTension);
+
+        shader.SetFloat("damping", BOUND_DAMPING);
+        shader.SetFloat("particleDrag", particleDrag);
 
         shader.SetFloat("Poly6KernelConstant", Kernels.Poly6KernelConstant);
         shader.SetFloat("Poly6GradKernelConstant", Kernels.Poly6GradKernelConstant);
@@ -114,16 +166,29 @@ public class FluidParticles : MonoBehaviour
         shader.SetFloat("ViscosityLaplaceKernelConstant", Kernels.ViscosityLaplaceKernelConstant);
         shader.SetFloat("SurfaceTensionConstant", Kernels.SurfaceTensionConstant);
         shader.SetFloat("SurfaceTensionOffset", Kernels.SurfaceTensionOffset);
+
+        shader.SetBuffer(pressureHandle, "particleBuffer", particleBuffer);
+        shader.SetBuffer(normalHandle, "particleBuffer", particleBuffer);
+        shader.SetBuffer(forceHandle, "particleBuffer", particleBuffer);
+        shader.SetBuffer(applyHandle, "particleBuffer", particleBuffer);
+        shader.SetBuffer(colliderHandle, "particleBuffer", particleBuffer);
+        shader.SetBuffer(colliderHandle, "colliders", collidersBuffer);
+
+        material.SetBuffer("particleBuffer", particleBuffer);
+        material.SetFloat("_Radius", radius);
     }
 
     private void DispatchKernels(int count)
     {
-    	shader.Dispatch(pressureHandle, groupSizeX, 1, 1);
-    }
+        UpdateColliders();
 
-    protected virtual void OnEnable()
-    {
-        InitShader();
+    	shader.Dispatch(pressureHandle, groupSizeX, 1, 1);
+        shader.Dispatch(normalHandle, groupSizeX, 1, 1);
+        shader.Dispatch(forceHandle, groupSizeX, 1, 1);
+        shader.Dispatch(applyHandle, groupSizeX, 1, 1);
+        shader.Dispatch(colliderHandle, groupSizeX, 1, 1);
+
+        Graphics.DrawMeshInstancedIndirect(particleMesh, 0, material, bounds, argsBuffer);
     }
 
     private void InitKernel()
@@ -146,14 +211,12 @@ public class FluidParticles : MonoBehaviour
         center = transform.position;
         corner = center - new Vector3(particleCountX * particleDistance / 2, particleCountY * particleDistance / 2, particleCountZ * particleDistance / 2);
 
+        bounds = new Bounds(center, Vector3.one * 1000);
+
         particleCount = particleCounts.x * particleCounts.y * particleCounts.z;
         particles = new Transform[particleCount];
-        particleRigidbodies = new Rigidbody[particleCount];
-        particleScripts = new ParticleCollision[particleCount];
 
-        adjacents = new List<int>[particleCount];
-
-        particleData = new Particle[particleCount];
+        particlesArray = new Particle[particleCount];
 
         for(int x = 0; x < particleCountX; x++)
         {
@@ -162,34 +225,32 @@ public class FluidParticles : MonoBehaviour
                 for(int z = 0; z < particleCountZ; z++)
                 {
                     int ind = x*particleCountY*particleCountZ + y*particleCountZ + z;
-                    
-                    adjacents[ind] = new List<int>();
+                    Vector3 pos = corner + new Vector3(x*particleDistance, y*particleDistance, z*particleDistance);
 
-                    //instantiate particles
-                    particles[ind] = Instantiate(particleObject, corner + new Vector3(x*particleDistance, y*particleDistance, z*particleDistance), Quaternion.identity).GetComponent<Transform>();
-                    particles[ind].parent = transform;
-                    particles[ind].gameObject.name = ind + "";
-                    particleRigidbodies[ind] = particles[ind].gameObject.GetComponent<Rigidbody>();
-                    particleRigidbodies[ind].velocity = new Vector3(0, -3f, 0);
-                    particleScripts[ind] = particles[ind].gameObject.GetComponent<ParticleCollision>();
-                    particleScripts[ind].index = ind;
-                    particleScripts[ind].smoothingLength = smoothingLength;
-
-                    particles[ind].gameObject.GetComponent<Renderer>().material.color = new Color(0, 0.8f, 1, 1);
-                    //
-
-                    Particle particle = particleData[ind];
-                    particle.ind = ind;
-                    particle.density = baseDensity;
-                    particle.pressure = 0;
-                    particle.force = Vector3.zero;
-                    particle.velocity = Vector3.zero;
-                    particle.normal = Vector3.zero;
-                    particle.position = particles[ind].position;
-                    particleData[ind] = particle;
+                    particlesArray[ind] = new Particle(ind, pos);
                 }
             }
         }
+    }
+
+    void UpdateColliders()
+    {
+        GameObject[] collidersGO = GameObject.FindGameObjectsWithTag("SPHCollider");
+        if (collidersArray == null || collidersArray.Length != collidersGO.Length)
+        {
+            collidersArray = new SPHCollider[collidersGO.Length];
+            if (collidersBuffer != null)
+            {
+                collidersBuffer.Dispose();
+            }
+            collidersBuffer = new ComputeBuffer(collidersArray.Length, SIZE_SPHCOLLIDER);
+        }
+        for (int i = 0; i < collidersArray.Length; i++)
+        {
+            collidersArray[i] = new SPHCollider(collidersGO[i].transform);
+        }
+        collidersBuffer.SetData(collidersArray);
+        shader.SetBuffer(colliderHandle, "colliders", collidersBuffer);      
     }
 
     void Start()
@@ -212,23 +273,16 @@ public class FluidParticles : MonoBehaviour
 
         while(true)
         {
-            for(int i = 0; i < particleCount; i++)
-            {
-                if(nStepCalcNum == 0) adjacents[i] = particleScripts[i].Adjacents();
+            DispatchKernels(particleCount);
 
-                int stride = sizeof(int);
-                neighborBuffer = new ComputeBuffer(adjacents[i].Count, stride);
-                neighborBuffer.SetData(adjacents[i]);
-                shader.SetBuffer(pressureHandle, "neighborBuffer", neighborBuffer);
-
-                DispatchKernels(adjacents[i].Count);
-                
-
-                yield return 0;
-            }
-
-            nStepCalcNum = (nStepCalcNum + 1) % neighborCalculationStep;
             yield return sec;
         }
+    }
+
+    private void OnDestroy()
+    {
+        particleBuffer.Dispose();
+        collidersBuffer.Dispose();
+        argsBuffer.Dispose();
     }
 }
