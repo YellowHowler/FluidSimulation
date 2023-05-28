@@ -56,7 +56,7 @@ public class FluidSim3 : MonoBehaviour
     private int particleNumX;
     private int particleNumY;
     private int particleNumZ;
-    private float particleDistance = 0.25f;
+    private float particleDistance = 0.2f;
 
     private int curParticleNum;
     private int nStepCalcNum = 0;
@@ -129,10 +129,10 @@ public class FluidSim3 : MonoBehaviour
                     particleScripts[ind].smoothingLength = smoothingLength;
 
                     densities[ind] = baseDensity;
-                    forces[ind] = new Vector3(0, 0, -5);
+                    forces[ind] = new Vector3(0, 0, -10);
                     velocities[ind] = zero;
 
-                    particleRigidbodies[ind].velocity = new Vector3(0, 0, -5);
+                    particleRigidbodies[ind].velocity = new Vector3(0, 0, -10);
                     
                     temperatures[ind] = 25;
 
@@ -185,7 +185,7 @@ public class FluidSim3 : MonoBehaviour
     void Start()
     {
         InitializeParticles();
-        Time.timeScale = 0.2f;
+        Time.timeScale = 0.05f;
 
         StartCoroutine(RunSim());
     }
@@ -315,11 +315,12 @@ public class FluidSim3 : MonoBehaviour
                     cohesionForce *= -surfaceTension * Mathf.Pow(particleMass, 2) * SurfaceTensionConstant;
                     curvatureForce *= -surfaceTension * particleMass;
 
-                    forces[i] += pressureForce + viscosityForce + cohesionForce + curvatureForce;
+                    forces[i] += pressureForce + viscosityForce + cohesionForce;// + curvatureForce;
 
                     //forces[i] *= 0.001f;
 
                     if(float.IsNaN(forces[i].x)) forces[i] = zero;
+                    forces[i] = Vector3.ClampMagnitude(forces[i], 40);
                 }
 
                 forces[i] += gravityForce * particleMass;

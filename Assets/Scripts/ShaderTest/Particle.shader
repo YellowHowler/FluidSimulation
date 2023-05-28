@@ -31,7 +31,7 @@ Shader "Custom/Particle"
         fixed4 _Color;
 
         #ifdef UNITY_PROCEDURAL_INSTANCING_ENABLED
-            struct SPHParticle
+            struct Particle
             {
                 float3 position;
                 float3 velocity;
@@ -40,7 +40,7 @@ Shader "Custom/Particle"
                 float pressure;
             };
 
-            StructuredBuffer<SPHParticle> particleBuffer;
+            StructuredBuffer<Particle> particleBuffer;
         #endif
 
         UNITY_INSTANCING_BUFFER_START(Props)
@@ -50,7 +50,7 @@ Shader "Custom/Particle"
         void setup()
         {
             #ifdef UNITY_PROCEDURAL_INSTANCING_ENABLED
-                SPHParticle particle = particleBuffer[unity_InstanceID];
+                Particle particle = particleBuffer[unity_InstanceID];
                 _Position = particle.position;
             #endif
         }

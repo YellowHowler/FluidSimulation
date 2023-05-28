@@ -36,7 +36,7 @@ public class FluidParticles : MonoBehaviour
     private int particleCountX;
     private int particleCountY;
     private int particleCountZ;
-    private float particleDistance = 0.25f;
+    private float particleDistance = 0.5f;
     //
 
     // basic fluid properties
@@ -183,10 +183,10 @@ public class FluidParticles : MonoBehaviour
         UpdateColliders();
 
     	shader.Dispatch(pressureHandle, groupSizeX, 1, 1);
-        shader.Dispatch(normalHandle, groupSizeX, 1, 1);
-        shader.Dispatch(forceHandle, groupSizeX, 1, 1);
-        shader.Dispatch(applyHandle, groupSizeX, 1, 1);
-        shader.Dispatch(colliderHandle, groupSizeX, 1, 1);
+        //shader.Dispatch(normalHandle, groupSizeX, 1, 1);
+        //shader.Dispatch(forceHandle, groupSizeX, 1, 1);
+        //shader.Dispatch(applyHandle, groupSizeX, 1, 1);
+        //shader.Dispatch(colliderHandle, groupSizeX, 1, 1);
 
         Graphics.DrawMeshInstancedIndirect(particleMesh, 0, material, bounds, argsBuffer);
     }
@@ -211,7 +211,7 @@ public class FluidParticles : MonoBehaviour
         center = transform.position;
         corner = center - new Vector3(particleCountX * particleDistance / 2, particleCountY * particleDistance / 2, particleCountZ * particleDistance / 2);
 
-        bounds = new Bounds(center, Vector3.one * 1000);
+        bounds = new Bounds(center, Vector3.one * 0);
 
         particleCount = particleCounts.x * particleCounts.y * particleCounts.z;
         particles = new Transform[particleCount];
@@ -259,25 +259,27 @@ public class FluidParticles : MonoBehaviour
         InitKernel();
         InitShader();
 
-        StartCoroutine(RunSim());
+        //StartCoroutine(RunSim());
     }
 
     void Update()
     {
-        
+        DispatchKernels(particleCount);
     }
 
+/*
     private IEnumerator RunSim()
     {
         WaitForSeconds sec = new WaitForSeconds(timeInterval);
 
         while(true)
         {
-            DispatchKernels(particleCount);
+            
 
             yield return sec;
         }
     }
+    */
 
     private void OnDestroy()
     {
