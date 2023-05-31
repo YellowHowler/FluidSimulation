@@ -5,6 +5,8 @@ using UnityEngine.UI;
 
 public class FluidParticles : MonoBehaviour
 {
+    [SerializeField] private GameObject particleObject;
+
     //for shader setup
     [SerializeField] private ComputeShader shader = null;
     protected int pressureHandle = -1;
@@ -52,9 +54,7 @@ public class FluidParticles : MonoBehaviour
     private const float DT = 0.0008f;
     //
 
-    // particle gameobjects
     private Transform[] particles;
-    //
 
     Bounds bounds;
     
@@ -102,7 +102,7 @@ public class FluidParticles : MonoBehaviour
     int SIZE_SPHCOLLIDER = 11 * sizeof(float);        
     //
 
-    //paritcle buffer
+    //particle buffer
     Particle[] particlesArray;
     ComputeBuffer particleBuffer;
     uint[] argsArray = { 0, 0, 0, 0, 0 };
@@ -183,12 +183,21 @@ public class FluidParticles : MonoBehaviour
         UpdateColliders();
 
     	shader.Dispatch(pressureHandle, groupSizeX, 1, 1);
-        //shader.Dispatch(normalHandle, groupSizeX, 1, 1);
-        //shader.Dispatch(forceHandle, groupSizeX, 1, 1);
-        //shader.Dispatch(applyHandle, groupSizeX, 1, 1);
-        //shader.Dispatch(colliderHandle, groupSizeX, 1, 1);
+        shader.Dispatch(normalHandle, groupSizeX, 1, 1);
+        shader.Dispatch(forceHandle, groupSizeX, 1, 1);
+        shader.Dispatch(applyHandle, groupSizeX, 1, 1);
+        shader.Dispatch(colliderHandle, groupSizeX, 1, 1);
 
-        Graphics.DrawMeshInstancedIndirect(particleMesh, 0, material, bounds, argsBuffer);
+        particleBuffer.GetData(particlesArray);
+
+        //Graphics.DrawMeshInstancedIndirect(particleMesh, 0, material, bounds, argsBuffer);
+
+        for(int i = 0; i < particleCount; i++)
+        {
+            particles[i].position = particlesArray[i].position;
+        }
+
+        print(particlesArray[0].position);
     }
 
     private void InitKernel()
@@ -213,10 +222,11 @@ public class FluidParticles : MonoBehaviour
 
         bounds = new Bounds(center, Vector3.one * 0);
 
-        particleCount = particleCounts.x * particleCounts.y * particleCounts.z;
-        particles = new Transform[particleCount];
+        particleCount = particleCountX * particleCountY * particleCountZ;
 
         particlesArray = new Particle[particleCount];
+
+        particles = new Transform[particleCount];
 
         for(int x = 0; x < particleCountX; x++)
         {
@@ -228,6 +238,9 @@ public class FluidParticles : MonoBehaviour
                     Vector3 pos = corner + new Vector3(x*particleDistance, y*particleDistance, z*particleDistance);
 
                     particlesArray[ind] = new Particle(ind, pos);
+                    particles[ind] = Instantiate(particleObject, pos, Quaternion.identity).GetComponent<Transform>();
+                    particles[ind].parent = transform;
+                    //print(pos);
                 }
             }
         }

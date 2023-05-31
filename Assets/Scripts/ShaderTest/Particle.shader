@@ -6,8 +6,8 @@ Shader "Custom/Particle"
     }
     SubShader
     {
-        Tags { "RenderType"="Opaque" }
-        LOD 200
+        Tags { "RenderType"="Opaque" "RenderPipeline" = "UniversalPipeline" "UniversalMaterialType" = "Lit" "IgnoreProjector" = "True" "ShaderModel"="2.0"}
+        LOD 300
 
         CGPROGRAM
         // Physically based Standard lighting model, and enable shadows on all light types  
@@ -33,11 +33,13 @@ Shader "Custom/Particle"
         #ifdef UNITY_PROCEDURAL_INSTANCING_ENABLED
             struct Particle
             {
-                float3 position;
-                float3 velocity;
-                float3 force;
+                int ind;
                 float density;
                 float pressure;
+                float3 force;
+                float3 velocity;
+                float3 normal;
+                float3 position;
             };
 
             StructuredBuffer<Particle> particleBuffer;
