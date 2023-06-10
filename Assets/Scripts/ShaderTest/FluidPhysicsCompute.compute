@@ -152,6 +152,8 @@ void CalculatePressure (uint3 id : SV_DispatchThreadID)
 
     particleI.density *= Poly6KernelConstant * particleMass * baseDensity;
     particleI.pressure = pressureConstant * (pow(particleI.density / baseDensity, 7) - 1);
+
+    particleBuffer[id.x] = particleI;
 }
 
 [numthreads(128,1,1)]
@@ -173,6 +175,8 @@ void CalculateNormal (uint3 id : SV_DispatchThreadID)
     }
 
     particleI.normal *= smoothingLength * particleMass * Poly6GradKernelConstant;
+
+    particleBuffer[id.x] = particleI;
 }
 
 [numthreads(128,1,1)]
@@ -209,6 +213,8 @@ void CalculateForces(uint3 id : SV_DispatchThreadID)
 
     particleI.force += pressureForce + viscosityForce + cohesionForce + curvatureForce;
     particleI.force += gravityForce * particleMass;
+
+    particleBuffer[id.x] = particleI;
 }
 
 
@@ -238,4 +244,6 @@ void ComputeColliders (uint3 id : SV_DispatchThreadID)
             particle.position = penetrationPosition - penetrationNormal * abs(penetrationLength);
         }
     }
+
+    particleBuffer[id.x] = particle;
 }
