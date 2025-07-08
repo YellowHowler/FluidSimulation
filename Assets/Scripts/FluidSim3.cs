@@ -293,9 +293,6 @@ public class FluidSim3 : MonoBehaviour
                         float distance = Vector3.Distance(particles[i].position, particles[j].position);
                         Vector3 distanceVect = (particles[i].position - particles[j].position);
 
-                        //forces[i] -= direction * ((pressures[i] + pressures[j]) / (2*densities[j])) * particleMass * SpikyGrad(distance); // pressure force
-
-                        //forces[i] -= direction * particleMass * pressures[j] / densities[j] * SpikyGrad(distance) / densities[i];
                         if (densities[j] > 0.001f) viscosityForce -= (velocities[j] - velocities[i]) / densities[j] * ViscosityLaplace(distance); // viscosity force
 
                         pressureForce -= (pressures[i] / Mathf.Pow(densities[i], 2) + pressures[j] / Mathf.Pow(densities[j], 2)) * SpikyGrad(particles[i].position - particles[j].position);
@@ -303,8 +300,6 @@ public class FluidSim3 : MonoBehaviour
                         float correctionFactor = 2 * baseDensity / (densities[i] + densities[j]);
                         cohesionForce += correctionFactor * (distanceVect / distance) * SurfaceTension(distance);
                         curvatureForce += correctionFactor * (normals[i] - normals[j]);
-
-                        //forces[i] += baseDensity / (densities[i] + densities[j]) * direction * particleMass * SurfaceTension(distance); // surface tension force
                     }
 
                     
